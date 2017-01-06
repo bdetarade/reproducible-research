@@ -1,0 +1,152 @@
+---
+title: "Coursera - Reproducible Research - Week 2- Project Assessment 1"
+author: "Benoit de TARADE"
+date: "6 janvier 2017"
+output: html_document
+---
+
+# Install package if need and load it
+
+
+```{r setup echo:FALSE}
+
+
+if (!require("ggplot2")) {
+  install.packages("ggplot2")
+}
+
+
+require("ggplot2")
+
+```
+
+# Upload, Unzip and read data
+
+- Url used for download : https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip
+- Output file activity.zip
+- Readed file activity.csv
+
+```{r fileUploadUnzip}
+f <- download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", destfile = "activity.zip")
+unzip("activity.zip", overwrite = TRUE)
+
+
+## Read activity and features labels
+activity <- read.csv("activity.csv")
+```
+
+# Histogram of the total number of steps taken each day
+
+
+```{r totalPerDay}
+# Calculate the total number of steps taken per day
+totalSteps <- tapply(activity$steps, activity$date, FUN=sum, na.rm=TRUE)
+# Histogram for the Total Steps
+hist(totalSteps, main="Histogram of Total Steps", xlab="Total number of steps taken each day")
+```
+
+
+
+#Mean and median number of steps taken each day
+
+```{r meanAndMedian}
+# Calculate and report the mean and median of the total number of steps taken per day
+meanVal <- mean(totalSteps, na.rm=TRUE)
+medianVal <- median(totalSteps, na.rm=TRUE)
+
+```
+
+- The mean value for the # of steps taken is `r meanVal`
+- The median value for the # of steps taken is `r medianVal`
+
+# Time series plot of the average number of steps taken
+
+```{r averageDailyActivity}
+activity.avg <- aggregate(x=list(steps=activity$steps), by=list(interval=activity$interval),
+                      FUN=mean, na.rm=TRUE)
+ggplot(data=activity.avg, aes(x=interval, y=steps)) +
+    geom_line() +
+    xlab("5-minute interval") +
+    ylab("Average # of steps taken")
+```
+
+# The 5-minute interval that, on average, contains the maximum number of steps
+
+```{r maxSteps}
+maxstep <- activity.avg[which.max(activity.avg$steps),]
+```
+
+- Maximum of Steps in 5-Minute Interval is `r maxstep`
+
+
+
+# Code to describe and show a strategy for imputing missing data
+
+```{r missingValue}
+activity.missing <- sum(is.na(activity$steps))
+```
+
+- Total number of missing values `r activity.missing`
+
+
+All of the missing values are filled in with mean value for that 5-minute interval.
+
+Replace each missing value with the mean value of its 5-minute interval
+```{r replaceMean}
+
+activity.repl <- function(steps, interval) {
+    rc <- NA
+    if (!is.na(steps))
+        rc <- c(steps)
+    else
+        rc <- (activity.avg[activity.avg$interval==interval, "steps"])
+    return(rc)
+}
+
+activity.comp <- activity
+activity.comp$steps <- mapply(activity.repl, activity.comp$steps, activity.comp$interval)
+```
+
+
+```{r drawHist2}
+activity.steps <- tapply(activity.comp$steps, activity.comp$date, FUN=sum)
+hist(activity.steps, main="Histogram of Total Steps - No NA's", xlab="Total number of steps taken each day")
+activity.steps.mean <- mean(activity.steps)
+activity.steps.median <- median(activity.steps)
+```
+The mean value for the # of total steps taken without NA's is `r activity.steps.mean`
+
+The median value for the # of total steps taken without NA's is `r activity.steps.median`
+
+
+# Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+## Build function to split weekdays and weekends
+
+Beware!!! If your'nt in english settings there will be only one facet 'bad language'
+
+```{r dayOfWeek}
+weekDay  <- function(date) {
+    day <- weekdays(date)
+    if (day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+        return("weekday")
+    else if (day %in% c("Saturday", "Sunday"))
+        return("weekend")
+    else
+        return("bad language")
+}
+
+```
+
+## Build plots
+
+```{r stepsforWeek}
+activity.comp$date <- as.Date(activity.comp$date)
+
+activity.comp$weekend <- sapply(activity.comp$date, FUN=weekDay)
+
+
+activity.avg <- aggregate(steps ~ interval + weekend, data=activity.comp, mean)
+ggplot(activity.avg, aes(interval, steps)) + geom_line() + facet_grid(weekend ~ .) +
+    xlab("5 Minute Interval") + ylab("# of steps")
+```
